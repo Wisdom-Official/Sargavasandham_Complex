@@ -1,0 +1,190 @@
+<!doctype html>
+<html lang="ml">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="robots" content="noindex">
+<title>അഡ്മിൻ ഡാഷ്ബോർഡ് · സർഗവസന്തം</title>
+<link href="https://fonts.googleapis.com/css2?family=Noto+Sans+Malayalam:wght@400;600;800&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<div class="bar"></div>
+
+<section class="login" id="login">
+  <div class="box">
+    <img src="sargavasantham-logo.png" alt="സർഗവസന്തം 2026-27">
+    <h2>അഡ്മിൻ ലോഗിൻ</h2>
+    <div class="f"><label for="pw">പാസ്‌വേഡ്</label><input class="inp" id="pw" type="password" autocomplete="current-password"></div>
+    <button class="btn" id="go" style="width:100%">ലോഗിൻ</button>
+    <div class="err" id="lerr" role="alert"></div>
+  </div>
+</section>
+
+<div id="app" hidden>
+  <header class="top"><div class="in">
+    <img class="logo" src="sargavasantham-logo.png" alt="സർഗവസന്തം 2026-27">
+    <div style="display:flex;gap:10px;align-items:center">
+      <a class="btn sec" href="index.html" target="_blank">ഗാലറി കാണുക</a>
+      <button class="btn sec" id="out">ലോഗൗട്ട്</button>
+    </div>
+  </div></header>
+
+  <main class="wrap">
+    <div class="stats" style="margin-top:22px">
+      <div class="stat"><b id="s1">0</b>സ്റ്റേജ് 1 ഫോട്ടോകൾ</div>
+      <div class="stat"><b id="s2">0</b>സ്റ്റേജ് 2 ഫോട്ടോകൾ</div>
+      <div class="stat"><b id="sp">0</b>പരിപാടികൾ</div>
+    </div>
+
+    <div class="dash">
+      <div style="display:grid;gap:20px">
+        <section class="panel">
+          <h3>ഫോട്ടോ അപ്‌ലോഡ്</h3>
+          <div class="f"><label for="ust">സ്റ്റേജ്</label>
+            <select class="sel" id="ust"><option value="1">സ്റ്റേജ് 1</option><option value="2">സ്റ്റേജ് 2</option></select></div>
+          <div class="f"><label for="upr">പരിപാടി</label><select class="sel" id="upr"></select></div>
+          <div class="f"><label for="ustu">കുട്ടിയുടെ പേര് / നമ്പർ (ഓപ്ഷണൽ)</label><input class="inp" id="ustu"></div>
+          <div class="drop" id="drop" tabindex="0" role="button">ഫോട്ടോകൾ ഇവിടെ ഇടുക അല്ലെങ്കിൽ തൊടുക<br><small>ഒരുമിച്ച് ഒന്നിലധികം ചേർക്കാം</small></div>
+          <input type="file" id="file" accept="image/*" multiple hidden>
+          <div class="prog" id="pg"><i></i></div>
+          <div class="msg" id="um"></div>
+        </section>
+
+        <section class="panel">
+          <h3>പരിപാടികൾ</h3>
+          <div class="f"><label for="pst">സ്റ്റേജ്</label>
+            <select class="sel" id="pst"><option value="1">സ്റ്റേജ് 1</option><option value="2">സ്റ്റേജ് 2</option></select></div>
+          <div class="f"><label for="pn">പരിപാടിയുടെ പേര്</label><input class="inp" id="pn"></div>
+          <button class="btn" id="addp">പരിപാടി ചേർക്കുക</button>
+          <div class="pl" id="pl"></div>
+        </section>
+      </div>
+
+      <section class="panel">
+        <div class="hd"><h3>അപ്‌ലോഡ് ചെയ്ത ഫോട്ടോകൾ</h3>
+          <div style="display:flex;gap:8px;flex-wrap:wrap">
+            <select class="sel" id="mst"><option value="1">സ്റ്റേജ് 1</option><option value="2">സ്റ്റേജ് 2</option></select>
+            <select class="sel" id="mpr"></select>
+          </div>
+        </div>
+        <div class="mg" id="mg"></div>
+      </section>
+    </div>
+  </main>
+</div>
+
+<script type="module">
+import { db, auth, CLOUD, ADMIN_EMAIL, thumb } from "./config.js";
+import { signInWithEmailAndPassword, signOut, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.14.1/firebase-auth.js";
+import { collection, getDocs, addDoc, deleteDoc, doc, query, where, serverTimestamp } from "https://www.gstatic.com/firebasejs/10.14.1/firebase-firestore.js";
+
+const $ = (id) => document.getElementById(id);
+let progs = [], photos = [];
+
+// ---- auth
+const login = async () => {
+  $("lerr").textContent = "";
+  try { await signInWithEmailAndPassword(auth, ADMIN_EMAIL, $("pw").value); }
+  catch { $("lerr").textContent = "പാസ്‌വേഡ് തെറ്റാണ്. വീണ്ടും ശ്രമിക്കുക."; }
+};
+$("go").onclick = login;
+$("pw").onkeydown = (e) => e.key === "Enter" && login();
+$("out").onclick = () => signOut(auth);
+onAuthStateChanged(auth, (u) => {
+  $("login").hidden = !!u; $("app").hidden = !u;
+  if (u) refresh();
+});
+
+// ---- data
+async function refresh() {
+  const [p, ph] = await Promise.all([getDocs(collection(db, "programs")), getDocs(collection(db, "photos"))]);
+  progs = p.docs.map(d => ({ id: d.id, ...d.data() })).sort((a, b) => a.name.localeCompare(b.name, "ml"));
+  photos = ph.docs.map(d => ({ id: d.id, ...d.data() })).sort((a, b) => (b.createdAt?.seconds || 0) - (a.createdAt?.seconds || 0));
+  $("s1").textContent = photos.filter(x => x.stage === "1").length;
+  $("s2").textContent = photos.filter(x => x.stage === "2").length;
+  $("sp").textContent = progs.length;
+  fillSelects(); renderProgs(); renderPhotos();
+}
+const opts = (stage, all) => (all ? '<option value="">എല്ലാ പരിപാടികളും</option>' : "") +
+  progs.filter(p => p.stage === stage).map(p => `<option>${p.name}</option>`).join("");
+function fillSelects() {
+  const u = $("upr").value, m = $("mpr").value;
+  $("upr").innerHTML = opts($("ust").value) || "<option value=''>ആദ്യം പരിപാടി ചേർക്കുക</option>";
+  $("mpr").innerHTML = opts($("mst").value, true);
+  if ([...$("upr").options].some(o => o.value === u)) $("upr").value = u;
+  if ([...$("mpr").options].some(o => o.value === m)) $("mpr").value = m;
+}
+$("ust").onchange = fillSelects;
+$("mst").onchange = () => { fillSelects(); renderPhotos(); };
+$("mpr").onchange = renderPhotos;
+
+// ---- programmes
+function renderProgs() {
+  const s = $("pst").value;
+  $("pl").innerHTML = progs.filter(p => p.stage === s).map(p =>
+    `<span class="pill">${p.name}<button data-id="${p.id}" aria-label="നീക്കുക">×</button></span>`).join("") || "<span class='msg'>പരിപാടികളൊന്നുമില്ല.</span>";
+}
+$("pst").onchange = renderProgs;
+$("addp").onclick = async () => {
+  const name = $("pn").value.trim(); if (!name) return;
+  await addDoc(collection(db, "programs"), { name, stage: $("pst").value, createdAt: serverTimestamp() });
+  $("pn").value = ""; refresh();
+};
+$("pl").onclick = async (e) => {
+  const b = e.target.closest("button"); if (!b || !confirm("ഈ പരിപാടി നീക്കണോ? ഫോട്ടോകൾ നിലനിൽക്കും.")) return;
+  await deleteDoc(doc(db, "programs", b.dataset.id)); refresh();
+};
+
+// ---- upload
+const drop = $("drop");
+drop.onclick = () => $("file").click();
+drop.onkeydown = (e) => (e.key === "Enter" || e.key === " ") && $("file").click();
+drop.ondragover = (e) => { e.preventDefault(); drop.classList.add("on"); };
+drop.ondragleave = () => drop.classList.remove("on");
+drop.ondrop = (e) => { e.preventDefault(); drop.classList.remove("on"); upload([...e.dataTransfer.files]); };
+$("file").onchange = (e) => { upload([...e.target.files]); e.target.value = ""; };
+
+async function upload(files) {
+  files = files.filter(f => f.type.startsWith("image/"));
+  const program = $("upr").value, stage = $("ust").value, student = $("ustu").value.trim();
+  if (!program) { $("um").textContent = "ആദ്യം പരിപാടി തിരഞ്ഞെടുക്കുക."; return; }
+  if (!files.length) return;
+  let done = 0, fail = 0, i = 0;
+  const bar = $("pg").firstElementChild;
+  const tick = () => { bar.style.width = ((done + fail) / files.length * 100) + "%"; $("um").textContent = `${done}/${files.length} അപ്‌ലോഡ് ചെയ്തു${fail ? ` · ${fail} പരാജയപ്പെട്ടു` : ""}`; };
+  tick();
+  const worker = async () => {
+    while (i < files.length) {
+      const f = files[i++];
+      try {
+        const fd = new FormData();
+        fd.append("file", f); fd.append("upload_preset", CLOUD.preset); fd.append("folder", `sargavasantham/stage${stage}`);
+        const r = await fetch(`https://api.cloudinary.com/v1_1/${CLOUD.name}/image/upload`, { method: "POST", body: fd });
+        if (!r.ok) throw 0;
+        const j = await r.json();
+        await addDoc(collection(db, "photos"), { url: j.secure_url, publicId: j.public_id, stage, program, student, createdAt: serverTimestamp() });
+        done++;
+      } catch { fail++; }
+      tick();
+    }
+  };
+  await Promise.all([worker(), worker(), worker()]);
+  $("um").textContent += " · പൂർത്തിയായി";
+  refresh();
+}
+
+// ---- manage photos
+function renderPhotos() {
+  const s = $("mst").value, p = $("mpr").value;
+  const l = photos.filter(x => x.stage === s && (!p || x.program === p));
+  $("mg").innerHTML = l.map(x => `<div class="mi"><img loading="lazy" src="${thumb(x.url, 300)}" alt=""><small>${x.program}${x.student ? " · " + x.student : ""}</small><button data-id="${x.id}" aria-label="ഫോട്ടോ നീക്കുക">×</button></div>`).join("")
+    || "<p class='msg'>ഫോട്ടോകളൊന്നുമില്ല.</p>";
+}
+$("mg").onclick = async (e) => {
+  const b = e.target.closest("button"); if (!b || !confirm("ഈ ഫോട്ടോ ഗാലറിയിൽ നിന്ന് നീക്കണോ?")) return;
+  await deleteDoc(doc(db, "photos", b.dataset.id)); refresh();
+};
+</script>
+</body>
+</html>

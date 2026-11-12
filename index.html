@@ -1,0 +1,128 @@
+<!doctype html>
+<html lang="ml">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>സർഗവസന്തം 2026-27 · ഫോട്ടോ ഗാലറി</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Noto+Sans+Malayalam:wght@400;600;800&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<div class="bar"></div>
+<header class="top"><div class="in">
+  <img class="logo" src="sargavasantham-logo.png" alt="സർഗവസന്തം 2026-27">
+  <img class="org" src="wisdom-education-board-logo.png" alt="Wisdom Education Board">
+</div></header>
+
+<main class="wrap">
+  <section class="hero">
+    <div>
+      <h1>നിങ്ങളുടെ കുട്ടിയുടെ വേദിയിലെ നിമിഷങ്ങൾ</h1>
+      <p>സ്റ്റേജും പരിപാടിയും തിരഞ്ഞെടുത്ത് ഫോട്ടോകൾ കാണുക. ഇഷ്ടമുള്ളത് ഒറിജിനൽ ക്വാളിറ്റിയിൽ ഡൗൺലോഡ് ചെയ്യാം.</p>
+    </div>
+    <div class="facts">
+      <div class="fact"><i style="background:var(--purple)"></i><div><b>വടകര കോംപ്ലക്സ്</b><span>വിസ്ഡം എജ്യുക്കേഷൻ ബോർഡ് · സർഗവസന്തം 2026-27</span></div></div>
+      <div class="fact"><i style="background:var(--orange)"></i><div><b>2026 നവംബർ 14, ശനി</b><span>തീയതി</span></div></div>
+      <div class="fact"><i style="background:var(--teal)"></i><div><b>കുഞ്ഞിപ്പള്ളി കോറോത്ത്</b><span>വേദി</span></div></div>
+    </div>
+  </section>
+
+  <div class="tabs" id="tabs" role="group" aria-label="സ്റ്റേജ്">
+    <button class="tab t1" data-s="1" aria-pressed="true">സ്റ്റേജ് 1</button>
+    <button class="tab t2" data-s="2" aria-pressed="false">സ്റ്റേജ് 2</button>
+  </div>
+  <div class="tools">
+    <input class="search" id="q" type="search" placeholder="കുട്ടിയുടെ പേര് / നമ്പർ തിരയുക" aria-label="തിരയുക">
+  </div>
+  <div class="chips" id="chips" aria-label="പരിപാടികൾ"></div>
+  <p class="count" id="count" aria-live="polite"></p>
+  <div class="grid" id="grid"></div>
+</main>
+
+<footer>
+  <img src="wisdom-education-board-logo.png" alt="Wisdom Education Board">
+  <div>സർഗവസന്തം 2026-27 · വടകര കോംപ്ലക്സ്</div>
+</footer>
+
+<div class="lb" id="lb" role="dialog" aria-modal="true" aria-label="ഫോട്ടോ">
+  <button class="x" id="x" aria-label="അടയ്ക്കുക">×</button>
+  <button class="nav l" id="prev" aria-label="മുമ്പത്തേത്">‹</button>
+  <img id="lbi" alt="">
+  <button class="nav r" id="next" aria-label="അടുത്തത്">›</button>
+  <div class="cap" id="cap"></div>
+  <div class="row"><a class="btn" id="dl" download>ഡൗൺലോഡ്</a></div>
+</div>
+
+<script type="module">
+import { db, thumb, view, dl } from "./config.js";
+import { collection, getDocs, query, where } from "https://www.gstatic.com/firebasejs/10.14.1/firebase-firestore.js";
+
+const $ = (id) => document.getElementById(id);
+const st = { stage: "1", prog: "", q: "", progs: {}, photos: {}, list: [], i: 0 };
+
+async function load(stage) {
+  if (st.photos[stage]) return;
+  $("grid").innerHTML = '<div class="empty">ലോഡ് ചെയ്യുന്നു…</div>';
+  try {
+    const [p, ph] = await Promise.all([
+      getDocs(query(collection(db, "programs"), where("stage", "==", stage))),
+      getDocs(query(collection(db, "photos"), where("stage", "==", stage)))
+    ]);
+    st.progs[stage] = p.docs.map(d => d.data().name).sort((a, b) => a.localeCompare(b, "ml"));
+    st.photos[stage] = ph.docs.map(d => d.data()).sort((a, b) => (b.createdAt?.seconds || 0) - (a.createdAt?.seconds || 0));
+  } catch (e) {
+    $("grid").innerHTML = '<div class="empty">ഫോട്ടോകൾ ലോഡ് ചെയ്യാനായില്ല. ഇന്റർനെറ്റ് പരിശോധിച്ച് വീണ്ടും ശ്രമിക്കുക.</div>';
+    throw e;
+  }
+}
+
+function render() {
+  const names = st.progs[st.stage] || [];
+  $("chips").innerHTML = ['<button class="chip" data-p="" aria-pressed="' + (st.prog === "") + '">എല്ലാ പരിപാടികളും</button>']
+    .concat(names.map(n => `<button class="chip" data-p="${n.replace(/"/g, "&quot;")}" aria-pressed="${st.prog === n}">${n}</button>`)).join("");
+  const q = st.q.trim().toLowerCase();
+  st.list = (st.photos[st.stage] || []).filter(p =>
+    (!st.prog || p.program === st.prog) && (!q || (p.student || "").toLowerCase().includes(q)));
+  $("count").textContent = st.list.length ? `${st.list.length} ഫോട്ടോകൾ` : "";
+  $("grid").innerHTML = st.list.length ? st.list.map((p, i) =>
+    `<button class="ph" data-i="${i}"><img loading="lazy" src="${thumb(p.url)}" alt="${p.program || ""}"><em>${p.program || ""}${p.student ? " · " + p.student : ""}</em></button>`).join("")
+    : '<div class="empty"><b>ഫോട്ടോകളൊന്നും ഇല്ല</b><br>ഈ തിരഞ്ഞെടുപ്പിൽ ഇതുവരെ ഫോട്ടോകൾ ചേർത്തിട്ടില്ല. പിന്നീട് വീണ്ടും നോക്കുക.</div>';
+}
+
+async function go() { await load(st.stage); render(); }
+
+$("tabs").onclick = (e) => {
+  const b = e.target.closest(".tab"); if (!b) return;
+  st.stage = b.dataset.s; st.prog = "";
+  document.querySelectorAll(".tab").forEach(t => t.setAttribute("aria-pressed", t === b));
+  go();
+};
+$("chips").onclick = (e) => { const b = e.target.closest(".chip"); if (b) { st.prog = b.dataset.p; render(); } };
+$("q").oninput = (e) => { st.q = e.target.value; render(); };
+$("grid").onclick = (e) => { const b = e.target.closest(".ph"); if (b) open(+b.dataset.i); };
+
+function open(i) {
+  st.i = (i + st.list.length) % st.list.length;
+  const p = st.list[st.i];
+  $("lbi").src = view(p.url);
+  $("cap").textContent = [p.program, p.student].filter(Boolean).join(" · ");
+  $("dl").href = dl(p.url);
+  $("lb").classList.add("on");
+}
+const close = () => { $("lb").classList.remove("on"); $("lbi").src = ""; };
+$("x").onclick = close;
+$("prev").onclick = () => open(st.i - 1);
+$("next").onclick = () => open(st.i + 1);
+$("lb").onclick = (e) => { if (e.target === $("lb")) close(); };
+document.addEventListener("keydown", (e) => {
+  if (!$("lb").classList.contains("on")) return;
+  if (e.key === "Escape") close();
+  if (e.key === "ArrowLeft") open(st.i - 1);
+  if (e.key === "ArrowRight") open(st.i + 1);
+});
+
+go();
+</script>
+</body>
+</html>
